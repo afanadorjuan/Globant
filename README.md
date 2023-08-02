@@ -1,74 +1,67 @@
-# Data Migration API - README  
-## Description 
-This project consists of an API developed with Flask that allows data migration from CSV files to a SQLite database. It also provides functionalities to insert batches of transactions and query data stored in the database. 
-## Requirements
-  - Python 3.x installed on the system. 
-  - - [Flask](https://flask.palletsprojects.com/en/2.1.x/installation/) installed in the development environment.
-  -  - [Pandas](https://pandas.pydata.org/docs/getting_started/install.html) installed in the development environment. 
-## Installation  
-1. Clone the GitHub repository: git clone [https://github.com/afanadorjuan/Globant.git](https://github.com/afanadorjuan/Globant.git)
-2. Navigate to the project directory:
-cd Globant
-3. Install project dependencies:
-pip install -r requirements.txt
+# Flask API with SQLite Database
+
+This is a simple Flask API that uses a SQLite database to store information about departments, jobs, and employees. The API allows users to upload CSV files to populate the database tables and provides various endpoints to fetch metrics and information from the database.
+
+## Installation
+
+To run the application, follow these steps:
+
+1. Clone the repository to your local machine.
+2. Make sure you have Python 3.x installed on your system.
+3. Install the required dependencies using pip:
+pip install flask pandas
 
 
 ## Usage
 
-### Endpoint `/upload` - Upload Data from CSV Files
+1. Start the application by running the following command:
 
-This endpoint allows you to upload historical data from CSV files to the database. The CSV files should be in comma-separated format (.csv). The data will be inserted into the "data_table" in the SQLite database.
+python app.py
 
-**Method**: `POST`
-**URL**: `/upload`
-**Parameters**:
-- `file`: CSV file to upload (in the request body).
 
-**Responses**:
-- 200 OK: The CSV file was successfully uploaded.
-- 400 Bad Request: Invalid file or incorrect format.
-- 500 Internal Server Error: An error occurred while processing the file.
+2. The API will be accessible at `http://127.0.0.1:5000/`.
 
-### Endpoint `/insert_batch` - Insert Batches of Transactions
+3. You can use tools like `curl` or Postman to interact with the API, or build your frontend to make HTTP requests to the API endpoints.
 
-This endpoint allows you to insert batches of transactions into the database. The batch of transactions should be a list of dictionaries, where each dictionary represents a data row to be inserted into the "data_table" in the SQLite database.
+## API Endpoints
 
-**Method**: `POST`
-**URL**: `/insert_batch`
-**Parameters**:
-- JSON data (in the request body).
+### Upload CSV
 
-**Responses**:
-- 200 OK: Batch of transactions inserted successfully.
-- 400 Bad Request: Invalid data or incorrect format.
-- 500 Internal Server Error: An error occurred while processing the batch of transactions.
+- **Endpoint**: `/upload`
+- **Method**: POST
+- **Description**: Uploads CSV files to populate the database tables.
+- **Parameters**: Each CSV file should be sent as a form-data file with a corresponding key. The key should be the name of the table (e.g., 'departments', 'hired_employees', 'jobs').
+- **Response**: JSON response with a success message or an error message.
 
-### Endpoint `/get_data` - Query Stored Data
+### Insert Batch
 
-This endpoint allows you to query all the data stored in the "data_table" of the SQLite database.
+- **Endpoint**: `/insert_batch?table=<table_name>`
+- **Method**: POST
+- **Description**: Inserts a batch of transactions into the specified table in the database.
+- **Parameters**: The table name should be specified as a query parameter (e.g., 'departments', 'hired_employees', 'jobs').
+- **Data**: The data should be sent in JSON format as a list of dictionaries.
+- **Response**: JSON response with a success message or an error message.
 
-**Method**: `GET`
-**URL**: `/get_data`
-**Responses**:
-- 200 OK: Returns the data from the "data_table" in JSON format.
-- 500 Internal Server Error: An error occurred while querying the database.
+### Metrics
 
-## Example Usage
+- **Endpoint**: `/metrics`
+- **Method**: GET
+- **Description**: Fetches the number of employees hired for each job and department in 2021, divided by quarter.
+- **Response**: JSON response with the metrics data.
 
-1. Upload data from CSV file:
-POST /upload Form Data:
--   file: [Select CSV file]
-2. Insert batch of transactions:
-POST /insert_batch
-Content-Type: application/json
-Body: [ {"column1": "value1", "column2": "value2", "column3": "value3"}, {"column1": "value4", "column2": "value5", "column3": "value6"}, {"column1": "value7", "column2": "value8", "column3": "value9"} ]
-3. Query stored data:
-GET /get_data
+### Departments Hired More Than Mean
 
-## Contributions
-None, tech assessment
-## Author
-[Juan Afanador](https://github.com/afanadorjuan)
+- **Endpoint**: `/departments/hired_more_than_mean`
+- **Method**: GET
+- **Description**: Fetches departments that hired more employees than the mean number of employees hired in 2021.
+- **Response**: JSON response with the departments' data.
 
-## License
-This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
+## Database Schema
+
+The SQLite database has three tables:
+
+1. `departments`: Holds information about different departments. It has columns: `id` and `department`.
+
+2. `jobs`: Stores information about various job roles. It has columns: `id` and `job`.
+
+3. `employees`: Contains data about the hired employees. It has columns: `id`, `name`, `hire_datetime`, `department_id`, and `job_id`. The `department_id` and `job_id` columns are foreign keys referencing the `departments` and `jobs` tables, respectively.
