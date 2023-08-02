@@ -217,59 +217,5 @@ def get_departments_hired_more_than_mean():
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
 
-    try:
-        # Establish connection with the SQLite database
-        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-
-        # Calculate the mean number of employees hired in 2021 for all departments
-        query_mean = """
-            SELECT AVG(num_employees) as mean_employees
-            FROM (
-                SELECT department_id, COUNT(*) as num_employees
-                FROM hired_employees
-                WHERE strftime('%Y', datetime) = '2021'
-                GROUP BY department_id
-            )
-        """
-        cursor_mean = conn.execute(query_mean)
-        mean_employees_data = cursor_mean.fetchall()
-        mean_employees = 0
-        if mean_employees_data:
-            mean_employees = mean_employees_data[0][0]
-
-        # Query to get the departments that hired more employees than the mean
-        query = f"""
-            SELECT d.id, d.department, COUNT(*) as hired
-            FROM hired_employees he
-            JOIN departments d ON he.department_id = d.id
-            WHERE strftime('%Y', he.datetime) = '2021'
-            GROUP BY he.department_id
-            HAVING COUNT(*) > {mean_employees}
-            ORDER BY hired DESC
-        """
-
-        # Execute the query and fetch the results
-        cursor = conn.execute(query)
-        results = cursor.fetchall()
-
-        # Close the connection with the database
-        conn.close()
-
-        # Create a list of dictionaries to hold the results
-        departments_hired_more_than_mean = []
-        for row in results:
-            department = {
-                'id': row[0],
-                'department': row[1],
-                'hired': row[2]
-            }
-            departments_hired_more_than_mean.append(department)
-
-        # Return the departments as a JSON response
-        return jsonify(departments_hired_more_than_mean)
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
-
 if __name__ == '__main__':
     app.run(debug=True)
