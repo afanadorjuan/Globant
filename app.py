@@ -9,40 +9,101 @@ app = Flask(__name__)
 # Ruta a la carpeta que contiene la base de datos SQLite
 db_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
+def create_tables():
+    try:
+        # Establish connection with the SQLite database
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+        cursor = conn.cursor()
+
+        # Create the departments table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS departments (
+                id INTEGER PRIMARY KEY,
+                department TEXT
+            )
+        ''')
+
+        # Create the jobs table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS jobs (
+                id INTEGER PRIMARY KEY,
+                job TEXT
+            )
+        ''')
+
+        # Create the employees table if it doesn't exist
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS employees (
+                id INTEGER PRIMARY KEY,
+                name TEXT,
+                hire_datetime TEXT,
+                department_id INTEGER,
+                job_id INTEGER,
+                FOREIGN KEY (department_id) REFERENCES departments (id),
+                FOREIGN KEY (job_id) REFERENCES jobs (id)
+            )
+        ''')
+
+        # Commit the changes and close the connection
+        conn.commit()
+        conn.close()
+
+    except Exception as e:
+        print('Error creating tables:', e)
+
+# Call the create_tables function on application startup
+create_tables()
+
+
+
 @app.route('/upload', methods=['POST'])
 def upload_csv():
     try:
-        # Get the CSV files sent in the request
-        departments_csv = request.files['departments']
-        jobs_csv = request.files['jobs']
-        employees_csv = request.files['hired_employees']
+        # Obtener los archivos CSV enviados en la solicitud
+        csv_files = request.files
 
-        # Validate that all three files are present and have the correct extension
-        if all(csv_file and csv_file.filename.endswith('.csv') for csv_file in [departments_csv, jobs_csv, employees_csv]):
-            # Read the CSV files with pandas
-            departments_df = pd.read_csv(departments_csv)
-            jobs_df = pd.read_csv(jobs_csv)
-            employees_df = pd.read_csv(employees_csv)
+        # Validar que se enviaron los archivos
+        if not csv_files:
+            return jsonify({'error': 'No CSV files were uploaded.'}), 400
 
-            # Connect to the SQLite database
-            conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+        for file_key, csv_file in csv_files.items():
+            # Validar que el archivo tiene la extensión CSV
+            if csv_file and csv_file.filename.endswith('.csv'):
+                # Leer el archivo CSV con pandas without headers and specific column names for departments table
+                if file_key == 'departments':
+                    df = pd.read_csv(csv_file, header=None, names=['id', 'department'])
+                else:
+                    df = pd.read_csv(csv_file, header=None)
 
-            # Insert data into the departments table
-            departments_df.to_sql('departments', conn, if_exists='replace', index=False)
+                # Guardar los datos en la base de datos SQLite
+                conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+                table_name = file_key  # Keeping the table name identical to the file key
+                df.to_sql(table_name, conn, if_exists='replace', index=False)
 
-            # Insert data into the jobs table
-            jobs_df.to_sql('jobs', conn, if_exists='replace', index=False)
+        return jsonify({'message': 'CSV files uploaded successfully!'})
 
-            # Insert data into the employees table
-            employees_df.to_sql('employees', conn, if_exists='replace', index=False)
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while processing the CSV files.', 'details': str(e)}), 500
+    try:
+        # Obtener los archivos CSV enviados en la solicitud
+        csv_files = request.files
 
-            # Close the connection
-            conn.close()
+        # Validar que se enviaron los archivos
+        if not csv_files:
+            return jsonify({'error': 'No CSV files were uploaded.'}), 400
 
-            return jsonify({'message': 'CSV files uploaded and data inserted successfully!'})
+        for file_key, csv_file in csv_files.items():
+            # Validar que el archivo tiene la extensión CSV
+            if csv_file and csv_file.filename.endswith('.csv'):
+                # Leer el archivo CSV con pandas without headers
+                df = pd.read_csv(csv_file, header=None)
 
-        else:
-            return jsonify({'error': 'Invalid files. Please upload CSV files for departments, jobs, and employees.'}), 400
+                # Guardar los datos en la base de datos SQLite
+                conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+                table_name = file_key.replace('_', '')  # Assuming the file keys are 'departments', 'hired_employees', and 'jobs'
+                df.to_sql(table_name, conn, if_exists='replace', index=False)
+
+        return jsonify({'message': 'CSV files uploaded successfully!'})
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while processing the CSV files.', 'details': str(e)}), 500
@@ -67,28 +128,6 @@ def insert_batch():
     except Exception as e:
         return jsonify({'error': 'An error occurred while processing the batch of transactions.', 'details': str(e)}), 500
 
-
-@app.route('/get_data', methods=['GET'])
-def get_data():
-    try:
-        # Establecer conexión con la base de datos SQLite
-        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-
-        # Ejecutar una consulta SQL para obtener todos los datos de la tabla data_table
-        cursor = conn.execute('SELECT * FROM data_table')
-
-        # Obtener los resultados de la consulta
-        data = cursor.fetchall()
-
-        # Cerrar la conexión con la base de datos
-        conn.close()
-
-        # Devolver los datos en formato JSON
-        return jsonify(data)
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while querying the database.', 'details': str(e)}), 500
-
 @app.route('/metrics', methods=['GET'])
 def get_metrics():
     try:
@@ -97,22 +136,24 @@ def get_metrics():
 
         # Query to get the number of employees hired for each job and department in 2021 divided by quarter
         query = """
-            SELECT department, job,
-                SUM(CASE WHEN strftime('%m', hire_date) BETWEEN '01' AND '03' THEN 1 ELSE 0 END) AS Q1,
-                SUM(CASE WHEN strftime('%m', hire_date) BETWEEN '04' AND '06' THEN 1 ELSE 0 END) AS Q2,
-                SUM(CASE WHEN strftime('%m', hire_date) BETWEEN '07' AND '09' THEN 1 ELSE 0 END) AS Q3,
-                SUM(CASE WHEN strftime('%m', hire_date) BETWEEN '10' AND '12' THEN 1 ELSE 0 END) AS Q4
-            FROM data_table
-            WHERE strftime('%Y', hire_date) = '2021'
-            GROUP BY department, job
-            ORDER BY department, job
+            SELECT d.department, j.job,
+                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '01' AND '03' THEN 1 ELSE 0 END) AS Q1,
+                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '04' AND '06' THEN 1 ELSE 0 END) AS Q2,
+                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '07' AND '09' THEN 1 ELSE 0 END) AS Q3,
+                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '10' AND '12' THEN 1 ELSE 0 END) AS Q4
+            FROM hired_employees e
+            JOIN jobs j ON e.job_id = j.id
+            JOIN departments d ON e.department_id = d.id
+            WHERE strftime('%Y', e.hire_datetime) = '2021'
+            GROUP BY d.department, j.job
+            ORDER BY d.department, j.job
         """
 
         # Execute the query and fetch the results
         cursor = conn.execute(query)
         results = cursor.fetchall()
 
-        # Cerrar la conexión con la base de datos
+        # Close the connection with the database
         conn.close()
 
         # Create a list of dictionaries to hold the results
@@ -128,11 +169,110 @@ def get_metrics():
             }
             metrics.append(metric)
 
-        # Devolver los datos en formato JSON
+        # Return the metrics as a JSON response
         return jsonify(metrics)
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the metrics.', 'details': str(e)}), 500
+    
+
+@app.route('/departments', methods=['GET'])
+def get_departments():
+    try:
+        # Establish connection with the SQLite database
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+
+        # Query to fetch all data from the departments table
+        query = "SELECT id,department FROM departments"
+
+        # Execute the query and fetch the results
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+
+        # Close the connection with the database
+        conn.close()
+
+        # Create a list of dictionaries to hold the results
+        departments = []
+        for row in results:
+            department = {
+                'id': row[0],
+                'department': row[1]
+            }
+            departments.append(department)
+
+        # Return the departments as a JSON response
+        return jsonify(departments)
+
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
+
+
+@app.route('/jobs', methods=['GET'])
+def get_jobs():
+    try:
+        # Establecer conexión con la base de datos SQLite
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+
+        # Query to get all records from the jobs table
+        query = "SELECT * FROM jobs"
+
+        # Execute the query and fetch the results
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+
+        # Close the connection with the database
+        conn.close()
+
+        # Create a list of dictionaries to hold the results
+        jobs = []
+        for row in results:
+            job = {
+                'id': row[0],
+                'job': row[1]
+            }
+            jobs.append(job)
+
+        # Return the jobs as a JSON response
+        return jsonify(jobs)
+
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while querying the jobs.', 'details': str(e)}), 500
+
+
+@app.route('/hired_employees', methods=['GET'])
+def get_hired_employees():
+    try:
+        # Establecer conexión con la base de datos SQLite
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+
+        # Query to get all records from the hired_employees table
+        query = "SELECT * FROM hired_employees"
+
+        # Execute the query and fetch the results
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+
+        # Close the connection with the database
+        conn.close()
+
+        # Create a list of dictionaries to hold the results
+        hired_employees = []
+        for row in results:
+            employee = {
+                'id': row[0],
+                'name': row[1],
+                'datetime': row[2],
+                'department_id': row[3],
+                'job_id': row[4]
+            }
+            hired_employees.append(employee)
+
+        # Return the hired employees as a JSON response
+        return jsonify(hired_employees)
+
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while querying the hired employees.', 'details': str(e)}), 500
 
 
 if __name__ == '__main__':
