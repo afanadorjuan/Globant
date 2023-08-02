@@ -1,12 +1,12 @@
-from flask import Flask
-
+from flask import Flask, request, jsonify
+import os
+import pandas as pd
+import sqlite3
 app = Flask(__name__)
 
-if __name__ == '__main__':
-    app.run(debug=True)
 
-
-from flask import request, jsonify
+# Ruta a la carpeta que contiene la base de datos SQLite
+db_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 @app.route('/upload', methods=['POST'])
 def upload_csv():
@@ -16,8 +16,13 @@ def upload_csv():
 
         # Validar que se envió un archivo
         if csv_file and csv_file.filename.endswith('.csv'):
-            # Implementar aquí la lógica para procesar el archivo CSV y guardar los datos en la base de datos
-            # Por ahora, simplemente retornamos un mensaje
+            # Leer el archivo CSV con pandas
+            df = pd.read_csv(csv_file)
+
+            # Guardar los datos en la base de datos SQLite
+            conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+            df.to_sql('data_table', conn, if_exists='replace', index=False)
+
             return jsonify({'message': 'CSV uploaded successfully!'})
 
         else:
@@ -25,3 +30,6 @@ def upload_csv():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while processing the CSV file.', 'details': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
