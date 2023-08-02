@@ -5,8 +5,7 @@ import sqlite3
 
 app = Flask(__name__)
 
-
-# Ruta a la carpeta que contiene la base de datos SQLite
+# Path to the folder containing the SQLite database
 db_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 def create_tables():
@@ -54,22 +53,20 @@ def create_tables():
 # Call the create_tables function on application startup
 create_tables()
 
-
-
 @app.route('/upload', methods=['POST'])
 def upload_csv():
     try:
-        # Obtener los archivos CSV enviados en la solicitud
+        # Get the CSV files sent in the request
         csv_files = request.files
 
-        # Validar que se enviaron los archivos
+        # Validate that files were uploaded
         if not csv_files:
             return jsonify({'error': 'No CSV files were uploaded.'}), 400
 
         for file_key, csv_file in csv_files.items():
-            # Validar que el archivo tiene la extensión CSV
+            # Validate that the file has the CSV extension
             if csv_file and csv_file.filename.endswith('.csv'):
-                # Leer el archivo CSV con pandas
+                # Read the CSV file using pandas
                 if file_key == 'departments':
                     # For the 'departments' table
                     df = pd.read_csv(csv_file, header=None, names=['id', 'department'])
@@ -83,7 +80,7 @@ def upload_csv():
                     # Handle any other unknown CSV files
                     return jsonify({'error': 'Unknown CSV file: {}'.format(file_key)}), 400
 
-                # Guardar los datos en la base de datos SQLite
+                # Save the data to the SQLite database
                 conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
                 table_name = file_key  # Keeping the table name identical to the file key
                 df.to_sql(table_name, conn, if_exists='replace', index=False)
@@ -96,19 +93,23 @@ def upload_csv():
 @app.route('/insert_batch', methods=['POST'])
 def insert_batch():
     try:
-        # Obtener los datos enviados en la solicitud
+        # Get the data sent in the request
         data = request.json
 
-        # Validar que se envió un lote de transacciones
+        # Validate that a batch of transactions and the specified table were sent
         if not data or not isinstance(data, list):
             return jsonify({'error': 'Invalid data. Please send a batch of transactions as a list of dictionaries.'}), 400
 
-        # Guardar el lote de transacciones en la base de datos SQLite
+        table_name = request.args.get('table')
+        if not table_name or table_name not in ['departments', 'hired_employees', 'jobs']:
+            return jsonify({'error': 'Invalid table name. Please specify a valid table: departments, hired_employees, jobs.'}), 400
+
+        # Save the batch of transactions to the SQLite database
         conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
         df = pd.DataFrame(data)
-        df.to_sql('data_table', conn, if_exists='append', index=False)
+        df.to_sql(table_name, conn, if_exists='append', index=False)
 
-        return jsonify({'message': 'Batch of transactions inserted successfully!'})
+        return jsonify({'message': f'Batch of transactions inserted successfully into the {table_name} table!'})
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while processing the batch of transactions.', 'details': str(e)}), 500
@@ -159,7 +160,6 @@ def get_metrics():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the metrics.', 'details': str(e)}), 500
-    
 
 @app.route('/departments/hired_more_than_mean', methods=['GET'])
 def get_departments_hired_more_than_mean():
