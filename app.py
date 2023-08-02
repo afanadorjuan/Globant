@@ -24,12 +24,12 @@ def create_tables():
         ''')
 
         # Create the jobs table if it doesn't exist
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS jobs (
                 id INTEGER PRIMARY KEY,
                 job TEXT
             )
-        ''')
+        """)
 
         # Create the employees table if it doesn't exist
         cursor.execute('''
@@ -69,38 +69,23 @@ def upload_csv():
         for file_key, csv_file in csv_files.items():
             # Validar que el archivo tiene la extensión CSV
             if csv_file and csv_file.filename.endswith('.csv'):
-                # Leer el archivo CSV con pandas without headers and specific column names for departments table
+                # Leer el archivo CSV con pandas
                 if file_key == 'departments':
+                    # For the 'departments' table
                     df = pd.read_csv(csv_file, header=None, names=['id', 'department'])
+                elif file_key == 'hired_employees':
+                    # For the 'hired_employees' table
+                    df = pd.read_csv(csv_file, header=None, names=['id', 'name', 'datetime', 'department_id', 'job_id'])
+                elif file_key == 'jobs':
+                    # For the 'jobs' table
+                    df = pd.read_csv(csv_file, header=None, names=['id', 'job'])
                 else:
-                    df = pd.read_csv(csv_file, header=None)
+                    # Handle any other unknown CSV files
+                    return jsonify({'error': 'Unknown CSV file: {}'.format(file_key)}), 400
 
                 # Guardar los datos en la base de datos SQLite
                 conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
                 table_name = file_key  # Keeping the table name identical to the file key
-                df.to_sql(table_name, conn, if_exists='replace', index=False)
-
-        return jsonify({'message': 'CSV files uploaded successfully!'})
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while processing the CSV files.', 'details': str(e)}), 500
-    try:
-        # Obtener los archivos CSV enviados en la solicitud
-        csv_files = request.files
-
-        # Validar que se enviaron los archivos
-        if not csv_files:
-            return jsonify({'error': 'No CSV files were uploaded.'}), 400
-
-        for file_key, csv_file in csv_files.items():
-            # Validar que el archivo tiene la extensión CSV
-            if csv_file and csv_file.filename.endswith('.csv'):
-                # Leer el archivo CSV con pandas without headers
-                df = pd.read_csv(csv_file, header=None)
-
-                # Guardar los datos en la base de datos SQLite
-                conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-                table_name = file_key.replace('_', '')  # Assuming the file keys are 'departments', 'hired_employees', and 'jobs'
                 df.to_sql(table_name, conn, if_exists='replace', index=False)
 
         return jsonify({'message': 'CSV files uploaded successfully!'})
@@ -131,22 +116,22 @@ def insert_batch():
 @app.route('/metrics', methods=['GET'])
 def get_metrics():
     try:
-        # Establecer conexión con la base de datos SQLite
+        # Establish a connection to the SQLite database
         conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
 
         # Query to get the number of employees hired for each job and department in 2021 divided by quarter
         query = """
-            SELECT d.department, j.job,
-                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '01' AND '03' THEN 1 ELSE 0 END) AS Q1,
-                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '04' AND '06' THEN 1 ELSE 0 END) AS Q2,
-                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '07' AND '09' THEN 1 ELSE 0 END) AS Q3,
-                SUM(CASE WHEN strftime('%m', e.hire_datetime) BETWEEN '10' AND '12' THEN 1 ELSE 0 END) AS Q4
+            SELECT d.department, jobs.job,
+                SUM(CASE WHEN strftime('%m', e.datetime) BETWEEN '01' AND '03' THEN 1 ELSE 0 END) AS Q1,
+                SUM(CASE WHEN strftime('%m', e.datetime) BETWEEN '04' AND '06' THEN 1 ELSE 0 END) AS Q2,
+                SUM(CASE WHEN strftime('%m', e.datetime) BETWEEN '07' AND '09' THEN 1 ELSE 0 END) AS Q3,
+                SUM(CASE WHEN strftime('%m', e.datetime) BETWEEN '10' AND '12' THEN 1 ELSE 0 END) AS Q4
             FROM hired_employees e
-            JOIN jobs j ON e.job_id = j.id
             JOIN departments d ON e.department_id = d.id
-            WHERE strftime('%Y', e.hire_datetime) = '2021'
-            GROUP BY d.department, j.job
-            ORDER BY d.department, j.job
+            JOIN jobs ON e.job_id = jobs.id
+            WHERE strftime('%Y', e.datetime) = '2021'
+            GROUP BY d.department, jobs.job
+            ORDER BY d.department, jobs.job
         """
 
         # Execute the query and fetch the results
@@ -174,8 +159,6 @@ def get_metrics():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the metrics.', 'details': str(e)}), 500
-    
-
 @app.route('/departments', methods=['GET'])
 def get_departments():
     try:
@@ -238,6 +221,34 @@ def get_jobs():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while querying the jobs.', 'details': str(e)}), 500
+    try:
+        # Establecer conexión con la base de datos SQLite
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+
+        # Query to get all records from the jobs table
+        query = "SELECT id,job FROM jobs"
+
+        # Execute the query and fetch the results
+        cursor = conn.execute(query)
+        results = cursor.fetchall()
+
+        # Close the connection with the database
+        conn.close()
+
+        # Create a list of dictionaries to hold the results
+        jobs = []
+        for row in results:
+            job = {
+                'id': row[0],
+                'job': row[1]
+            }
+            jobs.append(job)
+
+        # Return the jobs as a JSON response
+        return jsonify(jobs)
+
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while querying the jobs.', 'details': str(e)}), 500
 
 
 @app.route('/hired_employees', methods=['GET'])
@@ -273,6 +284,30 @@ def get_hired_employees():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while querying the hired employees.', 'details': str(e)}), 500
+
+
+@app.route('/delete_tables', methods=['DELETE'])
+def delete_tables():
+    try:
+        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
+        cursor = conn.cursor()
+
+        # Drop the hired_employees table
+        cursor.execute("DROP TABLE IF EXISTS hired_employees")
+
+        # Drop the departments table
+        cursor.execute("DROP TABLE IF EXISTS departments")
+
+        # Drop the jobs table
+        cursor.execute("DROP TABLE IF EXISTS jobs")
+
+        conn.commit()
+        conn.close()
+
+        return jsonify({'message': 'Tables deleted successfully!'})
+
+    except Exception as e:
+        return jsonify({'error': 'An error occurred while deleting tables.', 'details': str(e)}), 500
 
 
 if __name__ == '__main__':
