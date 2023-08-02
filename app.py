@@ -159,14 +159,40 @@ def get_metrics():
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the metrics.', 'details': str(e)}), 500
-@app.route('/departments', methods=['GET'])
-def get_departments():
+    
+
+@app.route('/departments/hired_more_than_mean', methods=['GET'])
+def get_departments_hired_more_than_mean():
     try:
         # Establish connection with the SQLite database
         conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
 
-        # Query to fetch all data from the departments table
-        query = "SELECT id,department FROM departments"
+        # Calculate the mean number of employees hired in 2021 for all departments
+        query_mean = """
+            SELECT AVG(num_employees) as mean_employees
+            FROM (
+                SELECT department_id, COUNT(*) as num_employees
+                FROM hired_employees
+                WHERE strftime('%Y', datetime) = '2021'
+                GROUP BY department_id
+            )
+        """
+        cursor_mean = conn.execute(query_mean)
+        mean_employees_data = cursor_mean.fetchall()
+        mean_employees = 0
+        if mean_employees_data:
+            mean_employees = mean_employees_data[0][0]
+
+        # Query to get the departments that hired more employees than the mean
+        query = f"""
+            SELECT d.id, d.department, COUNT(*) as hired
+            FROM hired_employees he
+            JOIN departments d ON he.department_id = d.id
+            WHERE strftime('%Y', he.datetime) = '2021'
+            GROUP BY he.department_id
+            HAVING COUNT(*) > {mean_employees}
+            ORDER BY hired DESC
+        """
 
         # Execute the query and fetch the results
         cursor = conn.execute(query)
@@ -176,29 +202,51 @@ def get_departments():
         conn.close()
 
         # Create a list of dictionaries to hold the results
-        departments = []
+        departments_hired_more_than_mean = []
         for row in results:
             department = {
                 'id': row[0],
-                'department': row[1]
+                'department': row[1],
+                'hired': row[2]
             }
-            departments.append(department)
+            departments_hired_more_than_mean.append(department)
 
         # Return the departments as a JSON response
-        return jsonify(departments)
+        return jsonify(departments_hired_more_than_mean)
 
     except Exception as e:
         return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
 
-
-@app.route('/jobs', methods=['GET'])
-def get_jobs():
     try:
-        # Establecer conexión con la base de datos SQLite
+        # Establish connection with the SQLite database
         conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
 
-        # Query to get all records from the jobs table
-        query = "SELECT * FROM jobs"
+        # Calculate the mean number of employees hired in 2021 for all departments
+        query_mean = """
+            SELECT AVG(num_employees) as mean_employees
+            FROM (
+                SELECT department_id, COUNT(*) as num_employees
+                FROM hired_employees
+                WHERE strftime('%Y', datetime) = '2021'
+                GROUP BY department_id
+            )
+        """
+        cursor_mean = conn.execute(query_mean)
+        mean_employees_data = cursor_mean.fetchall()
+        mean_employees = 0
+        if mean_employees_data:
+            mean_employees = mean_employees_data[0][0]
+
+        # Query to get the departments that hired more employees than the mean
+        query = f"""
+            SELECT d.id, d.department, COUNT(*) as hired
+            FROM hired_employees he
+            JOIN departments d ON he.department_id = d.id
+            WHERE strftime('%Y', he.datetime) = '2021'
+            GROUP BY he.department_id
+            HAVING COUNT(*) > {mean_employees}
+            ORDER BY hired DESC
+        """
 
         # Execute the query and fetch the results
         cursor = conn.execute(query)
@@ -208,107 +256,20 @@ def get_jobs():
         conn.close()
 
         # Create a list of dictionaries to hold the results
-        jobs = []
+        departments_hired_more_than_mean = []
         for row in results:
-            job = {
+            department = {
                 'id': row[0],
-                'job': row[1]
+                'department': row[1],
+                'hired': row[2]
             }
-            jobs.append(job)
+            departments_hired_more_than_mean.append(department)
 
-        # Return the jobs as a JSON response
-        return jsonify(jobs)
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while querying the jobs.', 'details': str(e)}), 500
-    try:
-        # Establecer conexión con la base de datos SQLite
-        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-
-        # Query to get all records from the jobs table
-        query = "SELECT id,job FROM jobs"
-
-        # Execute the query and fetch the results
-        cursor = conn.execute(query)
-        results = cursor.fetchall()
-
-        # Close the connection with the database
-        conn.close()
-
-        # Create a list of dictionaries to hold the results
-        jobs = []
-        for row in results:
-            job = {
-                'id': row[0],
-                'job': row[1]
-            }
-            jobs.append(job)
-
-        # Return the jobs as a JSON response
-        return jsonify(jobs)
+        # Return the departments as a JSON response
+        return jsonify(departments_hired_more_than_mean)
 
     except Exception as e:
-        return jsonify({'error': 'An error occurred while querying the jobs.', 'details': str(e)}), 500
-
-
-@app.route('/hired_employees', methods=['GET'])
-def get_hired_employees():
-    try:
-        # Establecer conexión con la base de datos SQLite
-        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-
-        # Query to get all records from the hired_employees table
-        query = "SELECT * FROM hired_employees"
-
-        # Execute the query and fetch the results
-        cursor = conn.execute(query)
-        results = cursor.fetchall()
-
-        # Close the connection with the database
-        conn.close()
-
-        # Create a list of dictionaries to hold the results
-        hired_employees = []
-        for row in results:
-            employee = {
-                'id': row[0],
-                'name': row[1],
-                'datetime': row[2],
-                'department_id': row[3],
-                'job_id': row[4]
-            }
-            hired_employees.append(employee)
-
-        # Return the hired employees as a JSON response
-        return jsonify(hired_employees)
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while querying the hired employees.', 'details': str(e)}), 500
-
-
-@app.route('/delete_tables', methods=['DELETE'])
-def delete_tables():
-    try:
-        conn = sqlite3.connect(os.path.join(db_folder, 'database.db'))
-        cursor = conn.cursor()
-
-        # Drop the hired_employees table
-        cursor.execute("DROP TABLE IF EXISTS hired_employees")
-
-        # Drop the departments table
-        cursor.execute("DROP TABLE IF EXISTS departments")
-
-        # Drop the jobs table
-        cursor.execute("DROP TABLE IF EXISTS jobs")
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({'message': 'Tables deleted successfully!'})
-
-    except Exception as e:
-        return jsonify({'error': 'An error occurred while deleting tables.', 'details': str(e)}), 500
-
+        return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
