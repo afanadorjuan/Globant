@@ -1,4 +1,4 @@
-# Flask API with SQLite Database
+# Globant Tech Assessment - Flask API with SQLite Database Juan Afanador
 
 This is a simple Flask API that uses a SQLite database to store information about departments, jobs, and employees. The API allows users to upload CSV files to populate the database tables and provides various endpoints to fetch metrics and information from the database.
 
