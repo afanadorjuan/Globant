@@ -97,7 +97,6 @@ For deployment on Azure, the following steps were taken:
 
 9. The Web App was successfully deployed and is now accessible at "globent.azurewebsites.net".
 
-s://imgur.com/2u97akd.png)
 
 Note: Cautionary information was provided regarding the public access of endpoints using Postman in the development environment. For production environments, it is essential to implement proper authentication and authorization mechanisms to secure the endpoints.
 
