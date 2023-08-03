@@ -218,4 +218,4 @@ def get_departments_hired_more_than_mean():
         return jsonify({'error': 'An error occurred while fetching the departments.', 'details': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
