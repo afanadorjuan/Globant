@@ -97,6 +97,8 @@ For deployment on Azure, the following steps were taken:
 
 9. The Web App was successfully deployed and is now accessible at "globent.azurewebsites.net".
 
+s://imgur.com/2u97akd.png)
+
 Note: Cautionary information was provided regarding the public access of endpoints using Postman in the development environment. For production environments, it is essential to implement proper authentication and authorization mechanisms to secure the endpoints.
 
 By following this Dockerization and deployment process, the application can be consistently and reliably run in different environments, making it easier to scale and manage.
@@ -109,3 +111,9 @@ Furthermore, the deployment process has been simplified and made more agile thro
 By leveraging Azure Web App, the application can be accessed through a secure and customizable domain (e.g., "globent.azurewebsites.net") without the need to manage infrastructure. The Azure Container Registry stores the Docker image, ensuring version control and consistency in deployment.
 
 For more data-intensive scenarios, Azure Data Factory and Azure Databricks can be seamlessly integrated to orchestrate data pipelines, perform ETL (Extract, Transform, Load) operations, and carry out advanced data analytics. The cloud-native approach empowers organizations to focus on developing data-driven applications without the burden of managing infrastructure, making development faster and more efficient.
+# Demo images
+![Web App](https://imgur.com/Z4o8yy5.png)
+
+![Postman test](https://imgur.com/2u97akd.png)
+
+![Docker](https://imgur.com/TxqvZh7.png)
